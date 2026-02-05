@@ -1,14 +1,13 @@
 import os
 import sqlite3
-import logging  # <--- NEW: Import logging tool
+import logging
 import google.generativeai as genai
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from dotenv import load_dotenv
 
-# --- 0. LOGGING SETUP (NEW) ---
-# This makes logs show up in Render with timestamps
+# --- 0. LOGGING SETUP ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -39,17 +38,17 @@ def init_db():
         ''')
         conn.commit()
         conn.close()
-        logger.info("Database initialized successfully.") # <--- NEW: Confirm DB works
+        logger.info("Database initialized successfully.")
     except Exception as e:
-        logger.error(f"Database Error: {e}") # <--- NEW: Log DB errors
+        logger.error(f"Database Error: {e}")
 
 init_db()
 
-# --- 3. DATA MODELS ---
+# --- 3. DATA MODELS (FIXED FOR 422 ERROR) ---
 class MessageContent(BaseModel):
-    sender: str
+    sender: Optional[str] = "unknown"  # Made optional with default
     text: str
-    timestamp: str
+    timestamp: Optional[str] = None    # Made optional (likely the cause!)
 
 class IncomingRequest(BaseModel):
     sessionId: str
@@ -61,8 +60,11 @@ class IncomingRequest(BaseModel):
 def format_history_for_ai(history: List[MessageContent], current_msg: str) -> str:
     script = ""
     for msg in history:
-        role = "Scammer" if msg.sender == "scammer" else "Grandpa Joe"
+        # Handle cases where sender is None
+        sender_name = msg.sender if msg.sender else "unknown"
+        role = "Scammer" if sender_name.lower() == "scammer" else "Grandpa Joe"
         script += f"{role}: {msg.text}\n"
+    
     script += f"Scammer: {current_msg}\n"
     script += "Grandpa Joe:" 
     return script
@@ -80,13 +82,10 @@ def call_gemini(formatted_transcript: str):
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
-        # <--- NEW: detailed error log
         logger.error(f"Gemini AI Failed: {e}")
         return "I am clicking the button but nothing is happening. Can you help?"
 
 # --- 5. API ENDPOINTS ---
-
-# <--- NEW: This fixes the "404 Not Found" log error!
 @app.get("/")
 def home():
     logger.info("Someone checked the server health.")
@@ -94,10 +93,10 @@ def home():
 
 @app.post("/analyze")
 async def analyze_message(payload: IncomingRequest, x_api_key: str = Header(...)):
-    logger.info(f"Received request for Session ID: {payload.sessionId}") # <--- NEW: Log incoming requests
+    logger.info(f"Received request for Session ID: {payload.sessionId}")
 
     if x_api_key != "my_secret_password":
-        logger.warning(f"Invalid API Key used: {x_api_key}") # <--- NEW: Log security issues
+        logger.warning(f"Invalid API Key used: {x_api_key}")
         raise HTTPException(status_code=401, detail="Invalid API Key")
 
     # Update Database
@@ -119,7 +118,7 @@ async def analyze_message(payload: IncomingRequest, x_api_key: str = Header(...)
     chat_context = format_history_for_ai(payload.conversationHistory, payload.message.text)
     ai_reply = call_gemini(chat_context)
     
-    logger.info("Successfully generated AI response.") # <--- NEW: Success log
+    logger.info("Successfully generated AI response.")
 
     return {
         "status": "success",
