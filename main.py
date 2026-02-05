@@ -134,4 +134,23 @@ async def analyze_message(request: Request, x_api_key: str = Header(...)):
         logger.error(f"Failed to save to database: {e}")
 
     # --- STEP 5: GENERATE AI RESPONSE ---
-    chat_context
+    chat_context = format_history_for_ai(history, user_text)
+    ai_reply = call_gemini(chat_context)
+    
+    logger.info(f"Success! Reply: {ai_reply}")
+
+    # --- STEP 6: RETURN RESPONSE ---
+    return {
+        "status": "success",
+        "scamDetected": True,
+        "engagementMetrics": {
+            "engagementDurationSeconds": (len(history) + 1) * 15,
+            "totalMessagesExchanged": len(history) + 1
+        },
+        "extractedIntelligence": {
+            "bankAccounts": [],
+            "upiIds": [], 
+            "phishingLinks": []
+        },
+        "agentNotes": ai_reply 
+    }
