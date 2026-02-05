@@ -1,7 +1,6 @@
 import os
 import json
 import re
-import sqlite3
 import asyncio
 import requests
 from datetime import datetime, timedelta
@@ -12,6 +11,7 @@ from pydantic import BaseModel, Field
 import logging
 from contextlib import asynccontextmanager
 import google.generativeai as genai
+import sqlite3  # This is built-in, no need to install
 
 # ========== CONFIGURATION ==========
 logging.basicConfig(level=logging.INFO)
